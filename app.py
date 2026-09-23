@@ -3,7 +3,6 @@ import requests
 import pandas as pd
 import joblib
 import os
-import time
 
 st.set_page_config(
     page_title="Real-Time Weather Rain Prediction",
@@ -11,7 +10,9 @@ st.set_page_config(
     layout="wide"
 )
 
-# Load model
+# -----------------------------
+# Load ML Model
+# -----------------------------
 MODEL_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
     "weather_rain_prediction_model.pkl"
@@ -19,109 +20,128 @@ MODEL_PATH = os.path.join(
 
 model = joblib.load(MODEL_PATH)
 
+# -----------------------------
+# Page Title
+# -----------------------------
 st.title("🌦️ Real-Time Weather Rain Prediction")
+
 st.write(
-    "Enter a location to get real-time weather information "
+    "Search for a location to get real-time weather information "
     "and predict whether it will rain tomorrow."
 )
 
-# Location search
+# -----------------------------
+# Location Search
+# -----------------------------
 st.subheader("📍 Search Location")
 
-location = st.text_input(
-    "Type a city name",
-    placeholder="Example: coim"
+# Popular city suggestions
+cities = [
+    "Coimbatore",
+    "Chennai",
+    "Bangalore",
+    "Mumbai",
+    "Delhi",
+    "Hyderabad",
+    "Kolkata",
+    "Pune",
+    "Madurai",
+    "Salem",
+    "Trichy",
+    "Erode",
+    "Tiruppur",
+    "Mysore",
+    "Kochi"
+]
+
+# HTML datalist for dropdown suggestions
+city_options = "".join(
+    f'<option value="{city}">' for city in cities
 )
 
-# Get location suggestions
-suggestions = []
+st.markdown(
+    f"""
+    <input
+        list="city-list"
+        id="city-search"
+        placeholder="Type a city name..."
+        style="
+            width:100%;
+            padding:12px;
+            border:1px solid #cccccc;
+            border-radius:8px;
+            font-size:16px;
+        "
+    >
 
-if location.strip():
+    <datalist id="city-list">
+        {city_options}
+    </datalist>
+    """,
+    unsafe_allow_html=True
+)
 
-    try:
-        geo_url = "https://geocoding-api.open-meteo.com/v1/search"
+# Actual Streamlit input
+location = st.text_input(
+    "Enter selected location",
+    placeholder="Example: Coimbatore",
+    label_visibility="collapsed"
+)
 
-        geo_params = {
-            "name": location,
-            "count": 5,
-            "language": "en",
-            "format": "json"
-        }
+# -----------------------------
+# Prediction Button
+# -----------------------------
+if st.button("🔮 Get Weather & Predict"):
 
-        response = requests.get(
-            geo_url,
-            params=geo_params,
-            timeout=10
-        )
+    if location.strip() == "":
+        st.warning("⚠️ Please enter a location.")
 
-        geo_data = response.json()
-
-        if "results" in geo_data:
-
-            for result in geo_data["results"]:
-
-                city = result.get("name", "")
-                country = result.get("country", "")
-                admin1 = result.get("admin1", "")
-
-                display_name = city
-
-                if admin1:
-                    display_name += f", {admin1}"
-
-                if country:
-                    display_name += f", {country}"
-
-                suggestions.append({
-                    "display": display_name,
-                    "name": city,
-                    "latitude": result["latitude"],
-                    "longitude": result["longitude"],
-                    "country": country
-                })
-
-    except Exception:
-        suggestions = []
-
-
-# Show suggestions
-selected_location = None
-
-if suggestions:
-
-    st.write("🔎 **Location Suggestions**")
-
-    for i, suggestion in enumerate(suggestions):
-
-        if st.button(
-            f"📍 {suggestion['display']}",
-            key=f"location_{i}"
-        ):
-
-            st.session_state["selected_location"] = suggestion
-            st.rerun()
-
-
-# Use selected location
-if "selected_location" in st.session_state:
-
-    selected_location = st.session_state["selected_location"]
-
-    st.success(
-        f"📍 Selected: {selected_location['display']}"
-    )
-
-    if st.button("🔮 Get Weather & Predict"):
+    else:
 
         with st.spinner("Fetching real-time weather..."):
 
             try:
 
-                latitude = selected_location["latitude"]
-                longitude = selected_location["longitude"]
-                city_name = selected_location["name"]
-                country = selected_location["country"]
+                # -----------------------------
+                # Geocoding
+                # -----------------------------
+                geo_url = (
+                    "https://geocoding-api.open-meteo.com/v1/search"
+                )
 
+                geo_params = {
+                    "name": location,
+                    "count": 1,
+                    "language": "en",
+                    "format": "json"
+                }
+
+                geo_response = requests.get(
+                    geo_url,
+                    params=geo_params,
+                    timeout=10
+                )
+
+                geo_data = geo_response.json()
+
+                if "results" not in geo_data:
+                    st.error(
+                        "❌ Location not found. "
+                        "Please enter a valid city."
+                    )
+                    st.stop()
+
+                result = geo_data["results"][0]
+
+                latitude = result["latitude"]
+                longitude = result["longitude"]
+
+                city_name = result["name"]
+                country = result.get("country", "")
+
+                # -----------------------------
+                # Weather API
+                # -----------------------------
                 weather_url = (
                     "https://api.open-meteo.com/v1/forecast"
                 )
@@ -166,6 +186,9 @@ if "selected_location" in st.session_state:
 
                 weather = weather_response.json()
 
+                # -----------------------------
+                # Current Weather
+                # -----------------------------
                 current = weather["current"]
 
                 temperature = current["temperature_2m"]
@@ -176,10 +199,24 @@ if "selected_location" in st.session_state:
                 rainfall = current["precipitation"]
                 cloud_cover = current["cloud_cover"]
 
-                min_temp = weather["daily"]["temperature_2m_min"][0]
-                max_temp = weather["daily"]["temperature_2m_max"][0]
-                daily_rainfall = weather["daily"]["precipitation_sum"][0]
+                # -----------------------------
+                # Daily Weather
+                # -----------------------------
+                min_temp = (
+                    weather["daily"]["temperature_2m_min"][0]
+                )
 
+                max_temp = (
+                    weather["daily"]["temperature_2m_max"][0]
+                )
+
+                daily_rainfall = (
+                    weather["daily"]["precipitation_sum"][0]
+                )
+
+                # -----------------------------
+                # 3 PM Weather
+                # -----------------------------
                 hourly_df = pd.DataFrame({
 
                     "time": weather["hourly"]["time"],
@@ -221,7 +258,9 @@ if "selected_location" in st.session_state:
                     pressure_3pm = pressure
                     wind_gust_speed = wind_gust
 
-                # ML input
+                # -----------------------------
+                # ML Input
+                # -----------------------------
                 input_data = pd.DataFrame([{
 
                     "MinTemp": min_temp,
@@ -240,16 +279,21 @@ if "selected_location" in st.session_state:
 
                 }])
 
-                prediction = model.predict(
-                    input_data
-                )[0]
+                # -----------------------------
+                # Prediction
+                # -----------------------------
+                prediction = model.predict(input_data)[0]
 
-                # Location
+                # -----------------------------
+                # Display Location
+                # -----------------------------
                 st.success(
                     f"📍 {city_name}, {country}"
                 )
 
-                # Current weather
+                # -----------------------------
+                # Weather Dashboard
+                # -----------------------------
                 st.subheader("🌦️ Current Weather")
 
                 col1, col2, col3, col4 = st.columns(4)
@@ -304,7 +348,9 @@ if "selected_location" in st.session_state:
                         f"{max_temp} °C"
                     )
 
-                # Prediction
+                # -----------------------------
+                # Prediction Result
+                # -----------------------------
                 st.subheader(
                     "🔮 Rain Tomorrow Prediction"
                 )
@@ -319,7 +365,6 @@ if "selected_location" in st.session_state:
 
                     st.success(
                         "☀️ NO — Rain is not predicted tomorrow."
-
                     )
 
             except Exception as e:
