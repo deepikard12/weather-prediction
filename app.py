@@ -3,7 +3,7 @@ import streamlit as st
 import requests
 import pandas as pd
 import joblib
-
+import os
 # -----------------------------
 # Page Configuration
 # -----------------------------
@@ -18,7 +18,12 @@ st.set_page_config(
 # Load ML Model
 # -----------------------------
 
-model = joblib.load("weather_rain_prediction_model.pkl")
+MODEL_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    "weather_rain_prediction_model.pkl"
+)
+
+model = joblib.load(MODEL_PATH)
 
 # -----------------------------
 # Title
