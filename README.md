@@ -1,4 +1,4 @@
-# 🌦️ Real-Time Weather Rain Prediction
+# 🌦️ Weather Rain Prediction
 
 A Machine Learning based web application that provides real-time weather information for a selected location and predicts whether it will rain tomorrow.
 
